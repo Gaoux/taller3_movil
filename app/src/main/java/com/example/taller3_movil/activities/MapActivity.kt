@@ -204,9 +204,9 @@ class MapActivity : AppCompatActivity() {
             ActionType.AVAILABILITY -> {
                 val availabilityDialog = AvailabilityDialogFragment()
                 availabilityDialog.setListener(object : AvailabilityDialogFragment.AvailabilityListener {
-                    override fun onStatusSelected(status: String) {
+                    override fun onStatusSelected(status: Boolean) {
                         // Show a Toast to confirm the selected status
-                        Toast.makeText(this@MapActivity, "Estado: $status", Toast.LENGTH_SHORT).show()
+//                        Toast.makeText(this@MapActivity, "Estado: $status", Toast.LENGTH_SHORT).show()
 
                         // Get the current user's ID from Firebase
                         val userId = FirebaseAuth.getInstance().currentUser?.uid
@@ -220,7 +220,7 @@ class MapActivity : AppCompatActivity() {
                                     Toast.makeText(this@MapActivity, "Estado de disponibilidad actualizado", Toast.LENGTH_SHORT).show()
                                 }
                                 .addOnFailureListener {
-                                    Toast.makeText( this@MapActivity,"Error al actualizar el estado de disponibilidad", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(this@MapActivity, "Error al actualizar el estado de disponibilidad", Toast.LENGTH_SHORT).show()
                                 }
                         } else {
                             Toast.makeText(this@MapActivity, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
@@ -229,6 +229,7 @@ class MapActivity : AppCompatActivity() {
                 })
                 availabilityDialog.show(supportFragmentManager, "AvailabilityDialog")
             }
+
             ActionType.USERS_LIST -> {
                 val intent = Intent(this, UsersListActivity::class.java)
                 this.startActivity(intent)

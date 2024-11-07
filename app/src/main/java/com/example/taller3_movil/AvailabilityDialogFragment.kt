@@ -5,7 +5,7 @@ import androidx.fragment.app.DialogFragment
 class AvailabilityDialogFragment : DialogFragment() {
 
     interface AvailabilityListener {
-        fun onStatusSelected(status: String)
+        fun onStatusSelected(status: Boolean)
     }
 
     private var listener: AvailabilityListener? = null
@@ -19,9 +19,10 @@ class AvailabilityDialogFragment : DialogFragment() {
         return AlertDialog.Builder(requireContext())
             .setTitle("Selecciona tu disponibilidad")
             .setItems(options) { _, which ->
-                val status = if (which == 0) "Disponible" else "Desconectado"
+                val status = which == 0  // Si es "Disponible", el valor será true; de lo contrario, false
                 listener?.onStatusSelected(status)
             }
             .create()
     }
 }
+

@@ -49,7 +49,7 @@ class UsersListActivity : AppCompatActivity() {
     @SuppressLint("NotifyDataSetChanged")
     private fun loadAvailableUsers() {
         // Listen to the "users" node in Firebase Database
-        database.orderByChild("available").equalTo(true) // Only fetch available users
+        database.orderByChild("isAvailable").equalTo(true) // Only fetch available users
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     usersList.clear()  // Clear the current list
