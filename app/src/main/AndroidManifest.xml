@@ -40,7 +40,7 @@
         <!-- Actividad de mapa (MapActivity) -->
         <activity
             android:name=".activities.MapActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.Taller3_movil">
 
         </activity>
@@ -58,6 +58,9 @@
             android:exported="false"
             android:theme="@style/Theme.Taller3_movil">
         </activity>
+
+        <!--  Service -->
+        <service android:name=".services.UserAvailabilityService" android:enabled="true" android:exported="false"/>
 
     </application>
 

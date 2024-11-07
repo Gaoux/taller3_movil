@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.example.taller3_movil.Constants.REQUEST_LOCATION_PERMISSION
 import com.example.taller3_movil.R
+import com.example.taller3_movil.services.UserAvailabilityService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -35,6 +36,8 @@ class MapActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var userLocation: Location
     private lateinit var bottomNav: BottomNavigationView
+    private lateinit var serviceIntent: Intent
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,6 +119,10 @@ class MapActivity : AppCompatActivity() {
         } else {
             Toast.makeText(this, "Error al cargar los puntos de interés", Toast.LENGTH_SHORT).show()
         }
+
+        serviceIntent = Intent(this, UserAvailabilityService::class.java)
+        startService(serviceIntent)
+
     }
 
     // Método para obtener la ubicación del usuario
@@ -193,7 +200,7 @@ class MapActivity : AppCompatActivity() {
         when (action) {
             ActionType.LOGOUT -> {
                 Toast.makeText(this, "Sesión cerrada", Toast.LENGTH_SHORT).show()
-
+                stopService(serviceIntent)
                 // Lógica para cerrar sesión (limpiar sesión, redirigir a LoginActivity)
                 // Aquí podrías limpiar la sesión del usuario, como borrar tokens, credenciales guardadas, etc.
 
@@ -217,7 +224,7 @@ class MapActivity : AppCompatActivity() {
                             // Update the availability status in Firebase
                             userReference.child("isAvailable").setValue(status)
                                 .addOnSuccessListener {
-                                    Toast.makeText(this@MapActivity, "Estado de disponibilidad actualizado", Toast.LENGTH_SHORT).show()
+//                                    Toast.makeText(this@MapActivity, "Estado de disponibilidad actualizado", Toast.LENGTH_SHORT).show()
                                 }
                                 .addOnFailureListener {
                                     Toast.makeText(this@MapActivity, "Error al actualizar el estado de disponibilidad", Toast.LENGTH_SHORT).show()
