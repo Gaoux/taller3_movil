@@ -43,7 +43,7 @@ class UserAdapter(
             nameTextView.text = user.name
             lastNameTextView.text = user.lastName
             emailTextView.text = user.email
-            availabilityTextView.text = if (user.isAvailable) "Available" else "Not Available"
+            availabilityTextView.text = if (user.isAvailable) "Availables" else "Not Available"
 
             // Load the user's image using Glide (make sure you add Glide as a dependency)
             Glide.with(context).load(user.imageUrl).into(imageView)
