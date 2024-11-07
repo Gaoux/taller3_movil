@@ -1,48 +1,42 @@
-<!-- item_user.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:padding="16dp"
+    android:orientation="horizontal"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:padding="16dp">
 
     <ImageView
-        android:id="@+id/user_image"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:id="@+id/userImage"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginEnd="16dp"
         android:src="@drawable/baseline_person_24" />
 
-    <TextView
-        android:id="@+id/user_name"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Nombre"
-        android:textSize="18sp" />
+        android:layout_weight="1">
 
-    <TextView
-        android:id="@+id/user_last_name"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Apellido"
-        android:textSize="16sp" />
+        <TextView
+            android:id="@+id/userName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="User Name"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/user_email"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Correo"
-        android:textSize="14sp" />
-
-    <TextView
-        android:id="@+id/user_availability"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Disponibilidad"
-        android:textSize="14sp"
-        android:textColor="@android:color/holo_green_dark" />
+        <TextView
+            android:id="@+id/userEmail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="user@example.com"
+            android:textSize="14sp" />
+    </LinearLayout>
 
     <Button
-        android:id="@+id/button_location"
+        android:id="@+id/locationButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Ubicacion" />
+        android:text="View Location" />
 </LinearLayout>

@@ -36,6 +36,14 @@
         android:layout_height="wrap_content"
         android:hint="Número de Identificación" />
 
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="center"
+        android:layout_marginTop="16dp"
+        android:contentDescription="Selected Image" />
+
     <Button
         android:id="@+id/btn_select_image"
         android:layout_width="match_parent"
