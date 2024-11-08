@@ -1,5 +1,7 @@
 # LivePoints
 LivePoint es una aplicación móvil que permite el registro y autenticación de usuarios mediante Firebase, mostrando en tiempo real las ubicaciones de usuarios disponibles y puntos de interés en un mapa interactivo.
+## Link video
+[Youtube](https://www.youtube.com/watch?v=WOf6DE82hc4)
 ## Características Principales
 ### Registro y Autenticación de Usuarios
 Los usuarios pueden registrarse con la siguiente información:
