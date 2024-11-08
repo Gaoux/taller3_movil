@@ -3,175 +3,249 @@ package com.example.taller3_movil.activities
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.preference.PreferenceManager
+import android.widget.Toast
 import android.util.Log
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.taller3_movil.Constants.REQUEST_LOCATION_PERMISSION
 import com.example.taller3_movil.R
 import com.example.taller3_movil.data.User
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.DatabaseReference
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.*
 import org.osmdroid.api.IMapController
+import org.osmdroid.config.Configuration
+import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 
 class UserLocationActivity : AppCompatActivity() {
 
     private lateinit var mapView: MapView
-    private lateinit var user: User
-    private lateinit var database: FirebaseDatabase
-    private lateinit var usersRef: DatabaseReference
+    private var myLocationOverlay: MyLocationNewOverlay? = null
+    private var mapController: IMapController? = null
+    private lateinit var database: DatabaseReference
     private lateinit var distanceTextView: TextView
+    private var trackingUserEmail: String? = null // Email of the user to track
+    private lateinit var currentLocation: GeoPoint // Declare the lateinit var for current location
+    private var handler: Handler = Handler(Looper.getMainLooper()) // Handler to post periodic tasks
+    private var marker: Marker? = null // Store reference to the marker
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_location)
 
+        // Load OSMDroid configuration for tile caching
+        val context = applicationContext
+        Configuration.getInstance().load(context, PreferenceManager.getDefaultSharedPreferences(context))
+
         distanceTextView = findViewById(R.id.distanceTextView)
-        // Initialize Firebase Database
-        database = FirebaseDatabase.getInstance()
-        usersRef = database.reference.child("users")
+        // Initialize Firebase database reference
+        database = FirebaseDatabase.getInstance().reference
 
-        // Get the email from the intent (or other source)
-        @Suppress("DEPRECATION")
-        val userToTrack = intent.getSerializableExtra("user") as? User
-        val emailToSearch = userToTrack?.email
+        // Retrieve the tracking user email from intent extras
+        val user: User? = intent.getSerializableExtra("user") as? User
+        trackingUserEmail = user!!.email
+        Log.d("UserLocationActivity", "Tracking user email: $trackingUserEmail")
 
-        Log.d("emailToSearch", "emailToSearch: $emailToSearch")
-
-        // Query to find the user by email
-        val query = usersRef.orderByChild("email").equalTo(emailToSearch)
-
-        query.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    for (userSnapshot in snapshot.children) {
-                        // Retrieve the user ID (key)
-                        val userId = userSnapshot.key
-                        if (userId != null) {
-                            // Get the user details using the user ID
-                            user = userSnapshot.getValue(User::class.java) ?: return
-                            // Initialize the map
-                            initMap(user)
-
-                            // Listen for real-time location changes
-                            val userLocationRef = database.getReference("users/$userId/location")
-                            userLocationRef.addValueEventListener(object : ValueEventListener {
-                                override fun onDataChange(locationSnapshot: DataSnapshot) {
-                                    val latitude = locationSnapshot.child("lat").getValue(Double::class.java)
-                                    val longitude = locationSnapshot.child("lon").getValue(Double::class.java)
-
-                                    if (latitude != null && longitude != null) {
-                                        updateUserLocationOnMap(latitude, longitude)
-                                        Log.d("Update location", "Location updated")
-                                    }
-                                }
-
-                                override fun onCancelled(error: DatabaseError) {
-                                    Toast.makeText(this@UserLocationActivity, "Error fetching location", Toast.LENGTH_SHORT).show()
-                                }
-                            })
-                        }
-                    }
-                } else {
-                    Log.d("Firebase", "User not found!")
-                    Toast.makeText(this@UserLocationActivity, "User not found", Toast.LENGTH_SHORT).show()
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {
-                Log.e("Firebase", "Error fetching user: ${error.message}")
-                Toast.makeText(this@UserLocationActivity, "Error fetching user", Toast.LENGTH_SHORT).show()
-            }
-        })
-    }
-
-    // Initialize the map with user's initial location
-    private fun initMap(user: User) {
+        // Initialize the map view
         mapView = findViewById(R.id.mapView)
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setBuiltInZoomControls(true)
         mapView.setMultiTouchControls(true)
 
-        // Log map initialization
-        Log.d("UserLocationActivity", "Initializing map with user's location: ${user.lat}, ${user.lon}")
+        // Initialize map controller
+        mapController = mapView.controller
+        mapController?.setZoom(14) // Set default zoom level
 
-        // Set the map to the user's location
-        val userLocation = GeoPoint(user.lat, user.lon)
-        val mapController: IMapController = mapView.controller
-        mapController.setCenter(userLocation)
-        mapController.setZoom(18)
-
-        // Add a marker for the user's location
-        val marker = Marker(mapView)
-        marker.position = userLocation
-        marker.title = "${user.name} ${user.lastName}"
-        mapView.overlays.add(marker)
-
-        // Add location overlay to show user's real-time location (optional)
-        val myLocationOverlay = MyLocationNewOverlay(mapView)
+        // Check location permission and set up location overlay
         if (checkLocationPermission()) {
-            myLocationOverlay.enableMyLocation()
+            setupLocationOverlay()
         } else {
             requestLocationPermission()
         }
+
+        // Fetch the tracking user's location from Firebase
+        fetchTrackedUserLocation()
+
+        // Listen for location changes in the database
+        listenForLocationChanges()
+
+        // Start periodic location check every 10 seconds
+        startLocationCheck()
+    }
+
+    // Initialize the location overlay to display device's current location on the map
+    private fun setupLocationOverlay() {
+        myLocationOverlay = MyLocationNewOverlay(mapView)
+        myLocationOverlay?.enableMyLocation()
+
+        // Set up location listener to update the currentLocation variable
+        myLocationOverlay?.runOnFirstFix {
+            val initialLocation = myLocationOverlay?.myLocation
+            if (initialLocation != null) {
+                currentLocation = initialLocation
+                runOnUiThread {
+                    Log.d("UserLocationActivity", "Current location: ${currentLocation.latitude}, ${currentLocation.longitude}")
+                }
+            }
+        }
+
+        // Listen for location updates and store the current location
+        myLocationOverlay?.enableFollowLocation()
         mapView.overlays.add(myLocationOverlay)
     }
 
-    // Update the user's location on the map as it changes
-    private fun updateUserLocationOnMap(latitude: Double, longitude: Double) {
-        val userLocation = GeoPoint(latitude, longitude)
-        val mapController: IMapController = mapView.controller
-        mapController.setCenter(userLocation)
+    // Fetch the tracked user's location from Firebase
+    private fun fetchTrackedUserLocation() {
+        trackingUserEmail?.let { email ->
+            // Query Firebase for the user with the matching email
+            database.child("users").orderByChild("email").equalTo(email)
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(dataSnapshot: DataSnapshot) {
+                        Log.d("UserLocationActivity", "Data snapshot retrieved for email: $email")
+                        for (snapshot in dataSnapshot.children) {
+                            val lat = snapshot.child("lat").getValue(Double::class.java)
+                            val lon = snapshot.child("lon").getValue(Double::class.java)
 
-        // Update the marker position
-        val marker = Marker(mapView)
-        marker.position = userLocation
-        mapView.overlays.clear() // Remove old markers
-        mapView.overlays.add(marker)
+                            if (lat != null && lon != null) {
+                                // Create GeoPoint for the tracked user's location
+                                val geoPoint = GeoPoint(lat, lon)
+                                Log.d("UserLocationActivity", "User location: lat = $lat, lon = $lon")
 
-        // Calculate the distance (straight line)
-        val distance = calculateDistance(user.lat, user.lon, latitude, longitude)
-        // Update the distance TextView on the main thread
-        runOnUiThread {
-            distanceTextView.text = "Distance: ${String.format("%.2f", distance)} meters"
+                                // Add a marker at the tracked user's location
+                                if (marker == null) {
+                                    marker = addMarker(geoPoint, "Tracked User Location")
+                                } else {
+                                    marker?.position = geoPoint // Update existing marker position
+                                }
+
+                                // Center the map on the user's location
+                                runOnUiThread {
+                                    mapController?.setCenter(geoPoint)
+                                    if (::currentLocation.isInitialized) {
+                                        val distance = currentLocation.distanceToAsDouble(geoPoint) / 1000.0
+                                        distanceTextView.text = "Distance: %.2f km".format(distance)
+                                    }
+                                }
+                            } else {
+                                Log.d("UserLocationActivity", "Location data missing for user")
+                                Toast.makeText(
+                                    this@UserLocationActivity,
+                                    "Location data missing for user",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+
+                    override fun onCancelled(databaseError: DatabaseError) {
+                        Log.e("UserLocationActivity", "Failed to retrieve user location: ${databaseError.message}")
+                        Toast.makeText(
+                            this@UserLocationActivity,
+                            "Failed to retrieve user location: ${databaseError.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                })
         }
     }
 
-    // Calculate distance in meters between two GeoPoints
-    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val earthRadius = 6371 // km
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2) * sin(dLon / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        val distance = earthRadius * c * 1000 // Distance in meters
+    // Listen for location changes in Firebase and update the marker
+    private fun listenForLocationChanges() {
+        trackingUserEmail?.let { email ->
+            // Listen for any changes in the location of the user with the matching email
+            database.child("users").orderByChild("email").equalTo(email)
+                .addChildEventListener(object : ChildEventListener {
+                    override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                        // Handle user added, if necessary
+                    }
 
-        // Log calculated distance
-        Log.d("UserLocationActivity", "Calculated distance: $distance meters")
-        return distance
+                    override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                        // Handle location change
+                        val lat = snapshot.child("lat").getValue(Double::class.java)
+                        val lon = snapshot.child("lon").getValue(Double::class.java)
+
+                        if (lat != null && lon != null) {
+                            val geoPoint = GeoPoint(lat, lon)
+
+                            // Update the marker position
+                            runOnUiThread {
+                                marker?.position = geoPoint
+                                mapController?.setCenter(geoPoint)
+                                if (::currentLocation.isInitialized) {
+                                    val distance = currentLocation.distanceToAsDouble(geoPoint) / 1000.0
+                                    distanceTextView.text = "Distance: %.2f km".format(distance)
+                                }
+                            }
+                        }
+                    }
+
+                    override fun onChildRemoved(snapshot: DataSnapshot) {
+                        // Handle user removed, if necessary
+                    }
+
+                    override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+                        // Handle user moved, if necessary
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                        Log.e("UserLocationActivity", "Error reading data: ${error.message}")
+                    }
+                })
+        }
     }
 
-    // Check if the app has location permission
+    // Add a marker on the map at the specified location
+    private fun addMarker(location: GeoPoint, title: String): Marker {
+        Log.d("UserLocationActivity", "Adding marker at: $location")
+        val marker = Marker(mapView)
+        marker.position = location
+        marker.title = title
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        mapView.overlays.add(marker)
+        return marker
+    }
+
+    // Start checking for location changes every 10 seconds
+    private fun startLocationCheck() {
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                // Check if the current location is initialized
+                if (::currentLocation.isInitialized) {
+                    myLocationOverlay?.myLocation?.let {
+                        val updatedLocation = it
+                        // Check if the location has changed
+                        if (currentLocation.latitude != updatedLocation.latitude ||
+                            currentLocation.longitude != updatedLocation.longitude) {
+                            currentLocation = updatedLocation
+                            // Update the distance to the tracked user
+                            trackingUserEmail?.let { email ->
+                                fetchTrackedUserLocation()
+                            }
+                        }
+                    }
+                }
+                // Repeat this task after 10 seconds
+                handler.postDelayed(this, 1000)
+            }
+        }, 100)
+    }
+
+    // Check if location permission is granted
     private fun checkLocationPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
-    // Request location permission
+    // Request location permission if not granted
     private fun requestLocationPermission() {
         ActivityCompat.requestPermissions(
             this,
@@ -180,19 +254,14 @@ class UserLocationActivity : AppCompatActivity() {
         )
     }
 
-    // Handle the result of the permission request
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    // Handle the result of location permission request
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_LOCATION_PERMISSION) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d("UserLocationActivity", "Location permission granted.")
-            } else {
-                Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show()
-            }
+        if (requestCode == REQUEST_LOCATION_PERMISSION && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            setupLocationOverlay()
+        } else {
+            Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show()
         }
     }
+
 }

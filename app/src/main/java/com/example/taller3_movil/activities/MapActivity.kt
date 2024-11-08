@@ -214,7 +214,7 @@ class MapActivity : AppCompatActivity() {
 
             // Update the user's location in Firebase
             userReference.child("lat").setValue(location.latitude)
-            userReference.child("long").setValue(location.longitude)
+            userReference.child("lon").setValue(location.longitude)
         }
     }
 
