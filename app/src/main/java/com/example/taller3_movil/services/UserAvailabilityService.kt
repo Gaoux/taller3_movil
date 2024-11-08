@@ -28,23 +28,32 @@ class UserAvailabilityService : Service() {
     }
 
     private fun listenForUserAvailabilityChanges() {
-        // Listening for any changes in the users' availability status
-        database.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                for (userSnapshot in snapshot.children) {
-                    // Manually get the values from the snapshot
-                    val isAvailable = userSnapshot.child("isAvailable").getValue(Boolean::class.java) ?: false // Default to false if not found
-                    val name = userSnapshot.child("name").getValue(String::class.java) ?: "Unknown"
-                    // Show a toast based on the availability status
-                    if (isAvailable) {
-                        Toast.makeText(this@UserAvailabilityService, "$name está disponible", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@UserAvailabilityService, "$name está desconectado", Toast.LENGTH_SHORT).show()
-                    }
+        // Listen to changes in the "users" node (specific user updates)
+        database.addChildEventListener(object : com.google.firebase.database.ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                // Handle user added, if necessary
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                // Only react to changes in the availability of a single user
+                val available = snapshot.child("available").getValue(Boolean::class.java) ?: false
+                val name = snapshot.child("name").getValue(String::class.java) ?: "Unknown"
+
+                // Show a toast based on the availability status of the user that changed
+                if (available) {
+                    Toast.makeText(this@UserAvailabilityService, "$name está disponible", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@UserAvailabilityService, "$name está desconectado", Toast.LENGTH_SHORT).show()
                 }
             }
 
+            override fun onChildRemoved(snapshot: DataSnapshot) {
+                // Handle user removed, if necessary
+            }
 
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+                // Handle user moved, if necessary
+            }
 
             override fun onCancelled(error: DatabaseError) {
                 // Handle database read failure
@@ -56,8 +65,11 @@ class UserAvailabilityService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         // Clean up the listener when the service is destroyed (optional)
-        database.removeEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {}
+        database.removeEventListener(object : com.google.firebase.database.ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onCancelled(error: DatabaseError) {}
         })
     }

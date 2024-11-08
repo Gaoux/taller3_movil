@@ -262,6 +262,7 @@ class MapActivity : AppCompatActivity() {
     private fun handleAction(action: ActionType) {
         when (action) {
             ActionType.LOGOUT -> {
+                stopService(serviceIntent)
                 // Lógica para cerrar sesión (limpiar sesión, redirigir a LoginActivity)
                 // Aquí podrías limpiar la sesión del usuario, como borrar tokens, credenciales guardadas, etc.
 
@@ -271,6 +272,27 @@ class MapActivity : AppCompatActivity() {
             }
             ActionType.AVAILABILITY -> {
                 val availabilityDialog = AvailabilityDialogFragment()
+                availabilityDialog.setListener(object : AvailabilityDialogFragment.AvailabilityListener {
+                    override fun onStatusSelected(status: Boolean) {
+                        // Get the current user's ID from Firebase
+                        val userId = FirebaseAuth.getInstance().currentUser?.uid
+                        if (userId != null) {
+                            // Create a reference to the user's data in Firebase
+                            val userReference = FirebaseDatabase.getInstance().reference.child("users").child(userId)
+
+                            // Update the availability status in Firebase
+                            userReference.child("available").setValue(status)
+                                .addOnSuccessListener {
+//                                    Toast.makeText(this@MapActivity, "Estado de disponibilidad actualizado", Toast.LENGTH_SHORT).show()
+                                }
+                                .addOnFailureListener {
+                                    Toast.makeText(this@MapActivity, "Error al actualizar el estado de disponibilidad", Toast.LENGTH_SHORT).show()
+                                }
+                        } else {
+                            Toast.makeText(this@MapActivity, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                })
                 availabilityDialog.show(supportFragmentManager, "AvailabilityDialog")
             }
             ActionType.USERS_LIST -> {

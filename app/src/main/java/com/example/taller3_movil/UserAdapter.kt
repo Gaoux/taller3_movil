@@ -1,6 +1,8 @@
 package com.example.taller3_movil
 
+import com.example.taller3_movil.activities.UserLocationActivity
 import android.content.Context
+import android.content.Intent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -32,7 +34,10 @@ class UserAdapter(
 
         // Set click listener for the "View Location" button
         holder.locationButton.setOnClickListener {
-            onLocationClick(user)
+            // When the "View Location" button is clicked, start com.example.taller3_movil.activities.UserLocationActivity
+            val intent = Intent(context, UserLocationActivity::class.java)
+            intent.putExtra("user", user)  // Pass the user object to the activity
+            context.startActivity(intent)
         }
     }
 

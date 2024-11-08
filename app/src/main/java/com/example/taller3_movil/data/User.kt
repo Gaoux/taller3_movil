@@ -1,5 +1,7 @@
 package com.example.taller3_movil.data
 
+import java.io.Serializable
+
 data class User(
     val name: String = "",
     val lastName: String = "",
@@ -8,6 +10,6 @@ data class User(
     val lat: Double = 0.0,
     val lon: Double = 0.0,
     val imageUrl: String = "",
-    val isAvailable: Boolean = true
-)
+    val available: Boolean = true
+) : Serializable
 

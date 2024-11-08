@@ -6,7 +6,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:allowBackup="true"
@@ -52,7 +53,7 @@
             android:theme="@style/Theme.Taller3_movil">
         </activity>
 
-        <!-- Actividad de lista de ubicacion de usaurio (UserLocationActivity) -->
+        <!-- Actividad de lista de ubicacion de usaurio (com.example.taller3_movil.activities.UserLocationActivity) -->
         <activity
             android:name=".activities.UserLocationActivity"
             android:exported="false"

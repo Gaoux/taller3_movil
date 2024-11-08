@@ -32,7 +32,7 @@ class UsersListActivity : AppCompatActivity() {
 
         // Initialize the user adapter with the list of users
         userAdapter = UserAdapter(this, usersList) { user ->
-            // When button clicked, navigate to UserLocationActivity
+            // When button clicked, navigate to com.example.taller3_movil.activities.UserLocationActivity
             val intent = Intent(this, UserLocationActivity::class.java)
             // Create a location string with latitude and longitude
             val location = "${user.lat},${user.lon}"
@@ -49,7 +49,7 @@ class UsersListActivity : AppCompatActivity() {
     @SuppressLint("NotifyDataSetChanged")
     private fun loadAvailableUsers() {
         // Listen to the "users" node in Firebase Database
-        database.orderByChild("isAvailable").equalTo(true) // Only fetch available users
+        database.orderByChild("available").equalTo(true) // Only fetch available users
             .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     usersList.clear()  // Clear the current list
