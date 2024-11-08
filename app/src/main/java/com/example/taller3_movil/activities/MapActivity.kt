@@ -6,14 +6,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Bundle
+import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.example.taller3_movil.Constants.REQUEST_LOCATION_PERMISSION
 import com.example.taller3_movil.R
 import com.example.taller3_movil.services.UserAvailabilityService
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -34,10 +35,12 @@ class MapActivity : AppCompatActivity() {
 
     private lateinit var mapView: MapView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationRequest: LocationRequest
+    private lateinit var locationCallback: LocationCallback
     private lateinit var userLocation: Location
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var serviceIntent: Intent
-
+    private var userMarker: Marker? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +54,8 @@ class MapActivity : AppCompatActivity() {
         mapView = findViewById(R.id.mapview)
         mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
         mapView.controller.setZoom(14)
+        mapView.setBuiltInZoomControls(true)
+        mapView.setMultiTouchControls(true)
 
         // Inicializar BottomNavigationView
         bottomNav = findViewById(R.id.bottomNav)
@@ -72,7 +77,7 @@ class MapActivity : AppCompatActivity() {
             }
         }
 
-        // Obtener la ubicación del usuario
+        // Inicializar FusedLocationProviderClient
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         // Verificar permisos y obtener ubicación
@@ -123,6 +128,49 @@ class MapActivity : AppCompatActivity() {
         serviceIntent = Intent(this, UserAvailabilityService::class.java)
         startService(serviceIntent)
 
+        // Setup LocationRequest for continuous updates
+        locationRequest = LocationRequest.create().apply {
+            interval = 10000  // 10 seconds
+            fastestInterval = 5000  // 5 seconds
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
+
+
+        // Initialize LocationCallback to handle location changes
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                super.onLocationResult(locationResult)
+                locationResult.let {
+                    for (location in it.locations) {
+                        if (location != null) {
+                            userLocation = location
+
+                            // Update the user's location in Firebase
+                            updateLocationInFirebase(location)
+
+                            // Update the map center and the user marker
+                            mapView.controller.setCenter(org.osmdroid.util.GeoPoint(location.latitude, location.longitude))
+
+                            // Check if the userMarker exists, if not, create a new one
+                            if (userMarker == null) {
+                                // Create the marker if it doesn't exist
+                                userMarker = Marker(mapView)
+                                userMarker?.title = "Tu Ubicación"
+                                mapView.overlays.add(userMarker)
+                            }
+                            updateLocationInFirebase(location)
+                            // Update the position of the marker
+                            userMarker?.position = org.osmdroid.util.GeoPoint(location.latitude, location.longitude)
+
+                        }
+                    }
+                }
+            }
+        }
+        fusedLocationClient.requestLocationUpdates(locationRequest,
+            locationCallback,
+            Looper.getMainLooper())
+
     }
 
     // Método para obtener la ubicación del usuario
@@ -145,13 +193,28 @@ class MapActivity : AppCompatActivity() {
                 mapView.controller.setCenter(org.osmdroid.util.GeoPoint(userLocation.latitude, userLocation.longitude))
 
                 // Crear un marcador para la ubicación del usuario
-                val userMarker = Marker(mapView)
-                userMarker.position = org.osmdroid.util.GeoPoint(userLocation.latitude, userLocation.longitude)
-                userMarker.title = "Tu Ubicación"
+                userMarker = Marker(mapView)
+                userMarker?.position = org.osmdroid.util.GeoPoint(userLocation.latitude, userLocation.longitude)
+                userMarker?.title = "Tu Ubicación"
                 mapView.overlays.add(userMarker)
+
+                // Update the user's location in Firebase
             } else {
                 Toast.makeText(this, "No se pudo obtener la ubicación", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    // Method to update the user's location in Firebase
+    private fun updateLocationInFirebase(location: Location) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            // Create a reference to the user's data in Firebase
+            val userReference = FirebaseDatabase.getInstance().reference.child("users").child(userId)
+
+            // Update the user's location in Firebase
+            userReference.child("lat").setValue(location.latitude)
+            userReference.child("long").setValue(location.longitude)
         }
     }
 
@@ -199,8 +262,6 @@ class MapActivity : AppCompatActivity() {
     private fun handleAction(action: ActionType) {
         when (action) {
             ActionType.LOGOUT -> {
-                Toast.makeText(this, "Sesión cerrada", Toast.LENGTH_SHORT).show()
-                stopService(serviceIntent)
                 // Lógica para cerrar sesión (limpiar sesión, redirigir a LoginActivity)
                 // Aquí podrías limpiar la sesión del usuario, como borrar tokens, credenciales guardadas, etc.
 
@@ -210,37 +271,19 @@ class MapActivity : AppCompatActivity() {
             }
             ActionType.AVAILABILITY -> {
                 val availabilityDialog = AvailabilityDialogFragment()
-                availabilityDialog.setListener(object : AvailabilityDialogFragment.AvailabilityListener {
-                    override fun onStatusSelected(status: Boolean) {
-                        // Show a Toast to confirm the selected status
-//                        Toast.makeText(this@MapActivity, "Estado: $status", Toast.LENGTH_SHORT).show()
-
-                        // Get the current user's ID from Firebase
-                        val userId = FirebaseAuth.getInstance().currentUser?.uid
-                        if (userId != null) {
-                            // Create a reference to the user's data in Firebase
-                            val userReference = FirebaseDatabase.getInstance().reference.child("users").child(userId)
-
-                            // Update the availability status in Firebase
-                            userReference.child("isAvailable").setValue(status)
-                                .addOnSuccessListener {
-//                                    Toast.makeText(this@MapActivity, "Estado de disponibilidad actualizado", Toast.LENGTH_SHORT).show()
-                                }
-                                .addOnFailureListener {
-                                    Toast.makeText(this@MapActivity, "Error al actualizar el estado de disponibilidad", Toast.LENGTH_SHORT).show()
-                                }
-                        } else {
-                            Toast.makeText(this@MapActivity, "Usuario no autenticado", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                })
                 availabilityDialog.show(supportFragmentManager, "AvailabilityDialog")
             }
-
             ActionType.USERS_LIST -> {
                 val intent = Intent(this, UsersListActivity::class.java)
-                this.startActivity(intent)
+                startActivity(intent)
             }
         }
+    }
+
+    // Asegurar que el servicio se detenga correctamente cuando la actividad se destruya
+    override fun onDestroy() {
+        super.onDestroy()
+        stopService(serviceIntent)
+        fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 }
